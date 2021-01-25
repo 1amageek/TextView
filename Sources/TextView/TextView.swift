@@ -25,6 +25,8 @@ struct _TextView: UIViewRepresentable {
 
     @Binding var size: CGSize
 
+    @Binding private var showPlaceholder: Bool
+
     var keyboardType: UIKeyboardType
 
     var isScrollEnabled: Bool
@@ -52,7 +54,8 @@ struct _TextView: UIViewRepresentable {
         font: UIFont = .systemFont(ofSize: 16, weight: .medium),
         maximumNumberOfLines: Int = 0,
         lineBreakMode: NSLineBreakMode = .byWordWrapping,
-        textContainerInset: UIEdgeInsets = .zero
+        textContainerInset: UIEdgeInsets = .zero,
+        showPlaceholder: Binding<Bool>
     ) {
         self._text = text
         self._isFirstResponder = isFirstResponder
@@ -65,6 +68,7 @@ struct _TextView: UIViewRepresentable {
         self.maximumNumberOfLines = maximumNumberOfLines
         self.lineBreakMode = lineBreakMode
         self.textContainerInset = textContainerInset
+        self._showPlaceholder = showPlaceholder
     }
 
     func makeCoordinator() -> Coordinator {
@@ -131,11 +135,8 @@ struct _TextView: UIViewRepresentable {
             if textView.markedTextRange == nil {
                 self.textView.text = textView.text
             }
-
-//            print(textView.frame.size)
-//            print(textView.textContainer.size)
-
             self.textView.size = textView.textContainer.size
+            self.textView.showPlaceholder = textView.text.isEmpty
         }
     }
 }
@@ -161,8 +162,6 @@ public struct TextView: View {
 
     public var isFirstResponder: Binding<Bool>?
 
-    @State private var isFirstResponder_: Bool = false
-
     public var keyboardType: UIKeyboardType
 
     public var isScrollEnabled: Bool
@@ -180,6 +179,10 @@ public struct TextView: View {
     public var textContainerInset: UIEdgeInsets
 
     @Binding public var size: CGSize
+
+    @State private var showPlaceholder: Bool = false
+
+    @State private var isFirstResponder_: Bool = false
 
     public init(
         _ text: Binding<String>,
@@ -222,12 +225,13 @@ public struct TextView: View {
                 font: font,
                 maximumNumberOfLines: maximumNumberOfLines,
                 lineBreakMode: lineBreakMode,
-                textContainerInset: textContainerInset
+                textContainerInset: textContainerInset,
+                showPlaceholder: self.$showPlaceholder
             )
             .background(
                 VStack {
                     if let placeholder = self.placeholder,
-                       self.text.isEmpty {
+                       self.showPlaceholder {
                         Text(placeholder)
                             .font(.system(size: font.pointSize))
                             .foregroundColor(Color(UIColor.placeholderText))
@@ -281,6 +285,12 @@ struct TextView_Previews: PreviewProvider {
                 TextView(.constant("text"), placeholder: "placeholder", font: UIFont.systemFont(ofSize: 20), textContainerInset: UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20))
             }
         }
+
+        TextView(.constant("text"),
+                 placeholder: "Send your message.",
+                 textAlignment: .center
+        )
+        .fixedSize(horizontal: false, vertical: true)
 
     }
 }
