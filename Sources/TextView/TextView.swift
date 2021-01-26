@@ -25,8 +25,6 @@ struct _TextView: UIViewRepresentable {
 
     @Binding var size: CGSize
 
-    @Binding private var showPlaceholder: Bool
-
     var keyboardType: UIKeyboardType
 
     var isScrollEnabled: Bool
@@ -43,6 +41,12 @@ struct _TextView: UIViewRepresentable {
 
     var textContainerInset: UIEdgeInsets
 
+    var textViewShouldBeginEditing: (() -> Bool)?
+
+    var textViewDidBeginEditing: (() -> Void)?
+
+    var textViewShouldEndEditing: (() -> Bool)?
+
     init(
         _ text: Binding<String>,
         isFirstResponder: Binding<Bool> = .constant(false),
@@ -55,7 +59,9 @@ struct _TextView: UIViewRepresentable {
         maximumNumberOfLines: Int = 0,
         lineBreakMode: NSLineBreakMode = .byWordWrapping,
         textContainerInset: UIEdgeInsets = .zero,
-        showPlaceholder: Binding<Bool>
+        textViewShouldBeginEditing: (() -> Bool)? = nil,
+        textViewDidBeginEditing: (() -> Void)? = nil,
+        textViewShouldEndEditing: (() -> Bool)? = nil
     ) {
         self._text = text
         self._isFirstResponder = isFirstResponder
@@ -68,7 +74,9 @@ struct _TextView: UIViewRepresentable {
         self.maximumNumberOfLines = maximumNumberOfLines
         self.lineBreakMode = lineBreakMode
         self.textContainerInset = textContainerInset
-        self._showPlaceholder = showPlaceholder
+        self.textViewShouldBeginEditing = textViewShouldBeginEditing
+        self.textViewDidBeginEditing = textViewDidBeginEditing
+        self.textViewShouldEndEditing = textViewShouldEndEditing
     }
 
     func makeCoordinator() -> Coordinator {
@@ -118,25 +126,29 @@ struct _TextView: UIViewRepresentable {
 
         var textView: _TextView
 
-        public init(_ view: _TextView) {
+        init(_ view: _TextView) {
             self.textView = view
         }
 
-        public func textViewDidBeginEditing(_ textView: UITextView) {
+        func textViewShouldBeginEditing(_ textView: UITextView) -> Bool {
+            return self.textView.textViewShouldBeginEditing?() ?? true
+        }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
             self.textView.$isFirstResponder.wrappedValue = true
+            self.textView.textViewDidBeginEditing?()
         }
 
-        public func textViewShouldEndEditing(_ textView: UITextView) -> Bool {
+        func textViewShouldEndEditing(_ textView: UITextView) -> Bool {
             self.textView.$isFirstResponder.wrappedValue = false
-            return true
+            return self.textView.textViewShouldEndEditing?() ?? true
         }
 
-        public func textViewDidChange(_ textView: UITextView) {
+        func textViewDidChange(_ textView: UITextView) {
             if textView.markedTextRange == nil {
                 self.textView.text = textView.text
             }
             self.textView.size = textView.textContainer.size
-            self.textView.showPlaceholder = textView.text.isEmpty
         }
     }
 }
@@ -178,9 +190,13 @@ public struct TextView: View {
 
     public var textContainerInset: UIEdgeInsets
 
-    @Binding public var size: CGSize
+    public var textViewShouldBeginEditing: (() -> Bool)?
 
-    @State private var showPlaceholder: Bool = false
+    public var textViewDidBeginEditing: (() -> Void)?
+
+    public var textViewShouldEndEditing: (() -> Bool)?
+
+    @Binding public var size: CGSize
 
     @State private var isFirstResponder_: Bool = false
 
@@ -196,7 +212,10 @@ public struct TextView: View {
         maximumNumberOfLines: Int = 0,
         lineBreakMode: NSLineBreakMode = .byWordWrapping,
         textContainerInset: UIEdgeInsets = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8),
-        size: Binding<CGSize> = .constant(.zero)
+        size: Binding<CGSize> = .constant(.zero),
+        textViewShouldBeginEditing: (() -> Bool)? = nil,
+        textViewDidBeginEditing: (() -> Void)? = nil,
+        textViewShouldEndEditing: (() -> Bool)? = nil
     ) {
         self._text = text
         self.placeholder = placeholder
@@ -210,6 +229,9 @@ public struct TextView: View {
         self.lineBreakMode = lineBreakMode
         self.textContainerInset = textContainerInset
         self._size = size
+        self.textViewShouldBeginEditing = textViewShouldBeginEditing
+        self.textViewDidBeginEditing = textViewDidBeginEditing
+        self.textViewShouldEndEditing = textViewShouldEndEditing
     }
 
     public var body: some View {
@@ -226,12 +248,13 @@ public struct TextView: View {
                 maximumNumberOfLines: maximumNumberOfLines,
                 lineBreakMode: lineBreakMode,
                 textContainerInset: textContainerInset,
-                showPlaceholder: self.$showPlaceholder
+                textViewShouldBeginEditing: textViewShouldBeginEditing,
+                textViewDidBeginEditing: textViewDidBeginEditing,
+                textViewShouldEndEditing: textViewShouldEndEditing
             )
             .background(
                 VStack {
-                    if let placeholder = self.placeholder,
-                       self.showPlaceholder {
+                    if let placeholder = self.placeholder, self.text.isEmpty {
                         Text(placeholder)
                             .font(.system(size: font.pointSize))
                             .foregroundColor(Color(UIColor.placeholderText))
